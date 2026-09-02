@@ -54,7 +54,15 @@ export class MusicSession {
   }
 
   async connect(voiceChannel) {
-    if (this.connection?.joinConfig?.channelId === voiceChannel.id) return;
+    if (this.connection?.joinConfig?.channelId === voiceChannel.id) {
+      try {
+        await entersState(this.connection, VoiceConnectionStatus.Ready, 45_000);
+        return;
+      } catch {
+        this.connection.destroy();
+        this.connection = null;
+      }
+    }
 
     this.connection?.destroy();
     this.connection = joinVoiceChannel({
@@ -64,8 +72,21 @@ export class MusicSession {
       selfDeaf: true
     });
 
-    await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
-    this.connection.subscribe(this.player);
+    try {
+      await entersState(this.connection, VoiceConnectionStatus.Ready, 45_000);
+      this.connection.subscribe(this.player);
+    } catch (error) {
+      this.connection.destroy();
+      this.connection = null;
+
+      if (error?.name === 'AbortError' || error?.code === 'ABORT_ERR') {
+        throw new Error(
+          'Voice connection timed out. Make sure DJ Duradel has Connect and Speak permissions, then try once more.'
+        );
+      }
+
+      throw error;
+    }
   }
 
   async enqueue(tracks) {
