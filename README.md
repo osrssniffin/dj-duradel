@@ -5,12 +5,18 @@ Discord Gateway/voice connections, yt-dlp, and FFmpeg.
 
 ## Features
 
-- `/play <song name or link>`, `/panel`, `/queue`, `/skip`, and `/stop`
-- One persistent `🎵 Peak Music` panel
-- Pause/resume, skip, stop, queue, shuffle, loop, volume, and leave buttons
+- One polished MatchBox-style `🎶 NOW PLAYING` panel with progress, artwork, queue preview,
+  requester, audio details, and every common playback control
+- `/play`, `/playtop`, `/playskip`, `/queue`, `/pause`, `/resume`, `/skip`, `/back`,
+  `/replay`, `/seek`, `/stop`, `/clear`, `/remove`, `/shuffle`, `/loop`, `/autoplay`,
+  `/volume`, `/filter`, `/stay`, `/leave`, and `/panel`
+- Queue, back, pause/resume, skip, autoplay, loop, rewind, fast-forward, replay, stop,
+  add-song, shuffle, 24/7, and volume buttons
+- Clean, bass boost, nightcore, vaporwave, 8D, and karaoke audio modes
+- Related-song autoplay and a 50-track playback history
 - YouTube search and broad URL/playlist support through yt-dlp
 - Spotify track metadata matching; optional Spotify playlist/album expansion
-- Automatic voice-channel join and idle leave
+- Automatic voice-channel join, idle leave, and optional 24/7 stay mode
 - Existing-panel recovery after a restart, even when local state is gone
 
 ## Recommended host: Cloudflare Containers
