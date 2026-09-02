@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+.wrangler
+.xdg
+node_modules
+data/state.json
+*.log
+*.zip

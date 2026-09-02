@@ -1,182 +1,120 @@
-# EASY REPLIT SETUP (NO GITHUB)
-
-This build includes `.replit` and `replit.nix`.
-
-Replit should provide Node.js 22 and `yt-dlp` from the Nix environment automatically.
-
-1. Open https://replit.com/import
-2. Choose ZIP.
-3. Upload this project ZIP.
-4. Add the required secrets in Replit.
-5. Open Shell and run:
-   `npm install`
-6. Then run:
-   `npm run setup`
-7. Click Run to test.
-8. Publish as a Reserved VM to keep the Discord bot online continuously.
-
-The bot now searches the last 50 messages in the configured music channel for its existing
-`🎵 Peak Music` panel if local state disappears after a deployment, preventing duplicate
-panel messages during normal redeploys.
-
----
-
 # Peak Music Bot
 
-A private Discord music bot built around one persistent `#music` control panel.
+A persistent-panel Discord music bot for Peak PvM. It runs as a Node.js process with
+Discord Gateway/voice connections, yt-dlp, and FFmpeg.
 
-## What this first build does
+## Features
 
-- `/play <song name or link>`
-- Automatically joins the voice channel of the person who requested the music
-- One persistent music panel instead of posting a new "now playing" message every song
-- Panel buttons:
-  - Add Song
-  - Pause / Resume
-  - Skip
-  - Stop
-  - Queue
-  - Shuffle
-  - Loop
-  - Volume down/up
-  - Leave
-- Shows:
-  - title
-  - thumbnail
-  - uploader/artist when available
-  - progress
-  - duration
-  - source
-  - approximate source bitrate/codec when yt-dlp reports it
-  - requester
-  - queue length
-  - next song
-- Entire playlists are expanded when the source is supported by yt-dlp
-- Text searches use YouTube search
-- Very broad URL support through yt-dlp's extractors + generic/embed extractor
-- Spotify:
-  - single track links work from public metadata, then match to a playable search result
-  - playlist/album expansion works when optional Spotify API client credentials are supplied
-- Leaves an empty VC after the configured idle timeout
+- `/play <song name or link>`, `/panel`, `/queue`, `/skip`, and `/stop`
+- One persistent `🎵 Peak Music` panel
+- Pause/resume, skip, stop, queue, shuffle, loop, volume, and leave buttons
+- YouTube search and broad URL/playlist support through yt-dlp
+- Spotify track metadata matching; optional Spotify playlist/album expansion
+- Automatic voice-channel join and idle leave
+- Existing-panel recovery after a restart, even when local state is gone
 
-## Important architecture note
+## Recommended host: Cloudflare Containers
 
-The actual Discord voice process must run as a persistent Node process.
+This repository is ready for Cloudflare Containers. A normal Cloudflare Worker cannot
+run Discord voice by itself; the Worker here starts and fronts one Linux container that
+runs the actual bot.
 
-Cloudflare Workers are useful for normal HTTP/interactions/status pieces, but they are not being put in the live audio path in this build. Discord voice requires a persistent Gateway/voice connection plus real-time audio processing/FFmpeg.
+Cloudflare Containers require the Workers Paid plan. This project uses one `basic`
+instance because FFmpeg and yt-dlp need more headroom than the smallest `lite` instance.
+The container is intentionally kept alive when HTTP traffic is idle because Discord
+Gateway and voice traffic do not pass through the Worker's health endpoint. A five-minute
+Cloudflare health schedule also starts it again automatically after an interruption.
 
-## Requirements
+### 1. Discord values
 
-- Node.js 22.12+ (Node 22 recommended)
-- yt-dlp installed and available as `yt-dlp`
-- Internet access
-- A Discord application/bot
-- Windows, Linux, or macOS
+You need these four private values:
 
-FFmpeg is included through the `ffmpeg-static` npm package.
+- `DISCORD_TOKEN`: Discord Developer Portal → your application → Bot → Reset/Copy Token
+- `DISCORD_CLIENT_ID`: Developer Portal → General Information → Application ID
+- `DISCORD_GUILD_ID`: right-click your Discord server → Copy Server ID
+- `MUSIC_CHANNEL_ID`: right-click the text channel for the panel → Copy Channel ID
 
-## Discord Developer Dashboard setup
+Enable Developer Mode under Discord Settings → Advanced before copying server/channel IDs.
+Never put the token in GitHub, `.env.example`, `wrangler.jsonc`, or a screenshot.
 
-1. Go to Discord Developer Portal.
-2. Create a new application, e.g. `Peak Music`.
-3. Open **Bot**.
-4. Create/reset the bot token and copy it.
-5. You do NOT need Message Content Intent for this build.
-6. Under OAuth2 / URL Generator (or the current Installation page), install the bot to your server with:
-   - `bot`
-   - `applications.commands`
-7. Bot permissions:
-   - View Channels
-   - Send Messages
-   - Embed Links
-   - Read Message History
-   - Connect
-   - Speak
+### 2. Connect the GitHub repository
 
-Do not give the bot Administrator unless you specifically want to.
+1. In Cloudflare, open **Workers & Pages** and connect this GitHub repository through
+   Workers Builds.
+2. Use `npx wrangler deploy` as the deploy command. The Dockerfile is built automatically.
+3. The first deployment creates the Worker and container application.
 
-## Find IDs
+### 3. Add Cloudflare secrets
 
-Enable Discord Developer Mode, then copy:
+In the deployed Worker, open **Settings → Variables and Secrets** and add these as
+encrypted secrets:
 
-- Application/Client ID -> `DISCORD_CLIENT_ID`
-- Server ID -> `DISCORD_GUILD_ID`
-- `#music` channel ID -> `MUSIC_CHANNEL_ID`
-
-## Install
-
-Copy `.env.example` to `.env` and fill it in.
-
-Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-npm install
+```text
+DISCORD_TOKEN
+DISCORD_CLIENT_ID
+DISCORD_GUILD_ID
+MUSIC_CHANNEL_ID
 ```
 
-Install yt-dlp if needed:
+Optional Spotify album/playlist expansion uses two more encrypted secrets:
 
-```powershell
-winget install yt-dlp.yt-dlp
+```text
+SPOTIFY_CLIENT_ID
+SPOTIFY_CLIENT_SECRET
 ```
 
-Verify:
+After saving secrets, redeploy if Cloudflare asks. Open the Worker URL once for an immediate
+start, or wait up to five minutes for the automatic health schedule. `/health` returns JSON.
+When `discordReady` becomes `true`, the bot is connected and the persistent panel should
+appear in the chosen text channel. Slash commands are registered automatically at startup.
 
-```powershell
-yt-dlp --version
-node --version
+### 4. Discord permissions
+
+Install the bot with the `bot` and `applications.commands` scopes and grant:
+
+- View Channels
+- Send Messages
+- Embed Links
+- Read Message History
+- Connect
+- Speak
+
+Administrator and Message Content Intent are not required.
+
+## Local setup
+
+Requirements: Node.js 22.12+, yt-dlp, Internet access, and a Discord application.
+FFmpeg is supplied locally by the `ffmpeg-static` npm package.
+
+1. Copy `.env.example` to `.env` and fill in the four required Discord values.
+2. Run `npm install`.
+3. Run `npm run setup` once to register the Discord commands.
+4. Run `npm start`.
+
+Useful checks:
+
+```text
+npm run check
+npm run cf:types
+npm run cf:check
 ```
 
-## Register the commands
+## Replit fallback
 
-```powershell
-npm run register
-```
+The original `.replit` and `replit.nix` files remain available. Import the repository,
+add the same four secrets, run `npm install`, then `npm run setup`. A Reserved VM is
+required for continuous operation.
 
-Guild commands normally appear quickly because they are registered directly to your server.
+## Secrets safety
 
-## Start it
+`.gitignore` excludes `.env`, `.env.*`, `.dev.vars`, `.dev.vars.*`, local state, logs,
+and Wrangler's local directory. Only blank examples may be committed.
 
-```powershell
-npm start
-```
+## Notes
 
-The bot creates one persistent panel in the configured `#music` channel and remembers that message ID in `data/state.json`.
-
-## Spotify playlist + album support
-
-Single Spotify track links do not require Spotify API credentials.
-
-For Spotify playlists and albums, create a Spotify developer app and put these in `.env`:
-
-```env
-SPOTIFY_CLIENT_ID=...
-SPOTIFY_CLIENT_SECRET=...
-```
-
-The bot reads Spotify's track metadata, searches for playable versions, and queues them. It does not attempt to bypass Spotify DRM or stream protected Spotify audio directly.
-
-## Broad-link behavior
-
-For normal URLs, the bot gives the URL to yt-dlp. That means supported extractors, embedded players, generic extractor URLs, direct media pages, and supported playlists can work without us maintaining a giant hard-coded domain list.
-
-This is intentionally "try the URL and report a clean error" rather than pretending every website is guaranteed forever. Sites change their players and anti-bot rules constantly.
-
-## Current limitations / next pass
-
-This is the first runnable architecture. Good next upgrades:
-
-- queue pagination + remove/move buttons
-- seek controls
-- `/volume 0-200`
-- per-user DJ permissions
-- saved favorites/playlists
-- history
-- reconnect/recovery after process restart
-- cached Spotify resolution
-- Apple Music metadata resolver
-- Deezer metadata resolver
-- SoundCloud-specific search polish
-- optional web dashboard/Cloudflare companion
-- container/VPS deployment file
-- per-guild configuration if the bot ever leaves Peak PvM
+- `data/state.json` is intentionally local and ignored. On a fresh container, the bot
+  searches recent messages and reuses its existing panel.
+- Container disk is ephemeral; the Discord panel is the source of continuity.
+- Source sites can change or block automated media access. yt-dlp should be kept current
+  by rebuilding/redeploying the container.
+- The bot streams playable public media; it does not bypass DRM.

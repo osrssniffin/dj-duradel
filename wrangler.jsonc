@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "peak-music-bot",
+  "main": "cloudflare/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "DEFAULT_VOLUME": "0.70",
+    "IDLE_LEAVE_MINUTES": "5",
+    "YTDLP_PATH": "/usr/local/bin/yt-dlp",
+    "FFMPEG_PATH": "/usr/bin/ffmpeg",
+    "PORT": "8080"
+  },
+  "containers": [
+    {
+      "class_name": "MusicBotContainer",
+      "image": "./Dockerfile",
+      "max_instances": 1,
+      "instance_type": "basic"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MUSIC_BOT",
+        "class_name": "MusicBotContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["MusicBotContainer"]
+    }
+  ]
+}

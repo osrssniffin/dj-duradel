@@ -10,13 +10,21 @@
   "scripts": {
     "start": "node src/index.js",
     "register": "node scripts/register-commands.js",
-    "check": "node --check src/index.js && node --check src/music.js && node --check src/panel.js && node --check src/sourceResolver.js && node --check src/store.js && node --check scripts/register-commands.js",
-    "setup": "node scripts/first-run.js"
+    "check": "node --check src/index.js && node --check src/health.js && node --check src/music.js && node --check src/panel.js && node --check src/sourceResolver.js && node --check src/store.js && node --check scripts/register-commands.js && node --check scripts/container-start.js && tsc --noEmit",
+    "setup": "node scripts/first-run.js",
+    "cf:types": "wrangler types",
+    "cf:check": "wrangler types --check && tsc --noEmit",
+    "cf:deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@cloudflare/containers": "^0.3.7",
     "@discordjs/voice": "0.19.2",
     "discord.js": "14.27.0",
     "dotenv": "16.6.1",
     "ffmpeg-static": "5.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "wrangler": "^4.128.0"
   }
 }
