@@ -95,6 +95,33 @@ async function updatePanel() {
   }
 }
 
+async function makeActivePanel(message) {
+  const previousId = state.panelMessageId;
+  const previousChannelId = state.panelChannelId;
+
+  state.panelMessageId = message.id;
+  state.panelChannelId = message.channelId;
+  await saveState(state);
+
+  if (previousId && previousId !== message.id) {
+    try {
+      const previousChannel = await client.channels.fetch(previousChannelId || process.env.MUSIC_CHANNEL_ID);
+      if (previousChannel?.isTextBased()) {
+        const previous = await previousChannel.messages.fetch(previousId);
+        await previous.delete();
+      }
+    } catch {}
+  }
+
+  return message;
+}
+
+async function movePanelToBottom() {
+  const channel = await musicChannel();
+  const message = await channel.send(buildPanel(session));
+  return makeActivePanel(message);
+}
+
 function startPanelTicker() {
   clearInterval(panelUpdateTimer);
   panelUpdateTimer = setInterval(() => {
@@ -139,7 +166,8 @@ async function addInput(interaction, input, options = {}) {
   const voice = await requireVoice(interaction);
   if (!voice) return;
 
-  await interaction.deferReply({ ephemeral: true });
+  const inMusicChannel = interaction.channelId === process.env.MUSIC_CHANNEL_ID;
+  await interaction.deferReply({ ephemeral: !inMusicChannel });
 
   try {
     await session.connect(voice);
@@ -154,7 +182,13 @@ async function addInput(interaction, input, options = {}) {
         : session.current === tracks[0]
           ? `▶️ Now playing ${label}.`
           : `✅ Queued ${label} • ${session.queue.length} upcoming.`;
-    await interaction.editReply(message);
+    if (inMusicChannel) {
+      const panelMessage = await interaction.editReply(buildPanel(session));
+      await makeActivePanel(panelMessage);
+    } else {
+      const panelMessage = await movePanelToBottom();
+      await interaction.editReply(`${message}\n[Open the player](${panelMessage.url})`);
+    }
   } catch (err) {
     console.error(err);
     await interaction.editReply(`Couldn't queue that: ${err.message.slice(0, 1700)}`);
