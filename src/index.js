@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import {
+  ActivityType,
   Client,
   GatewayIntentBits,
   ModalBuilder,
@@ -10,7 +11,7 @@ import {
 
 import { AUDIO_FILTERS, MusicSession } from './music.js';
 import { startHealthServer } from './health.js';
-import { buildPanel, formatQueue } from './panel.js';
+import { buildPanel, formatHelp, formatQueue } from './panel.js';
 import { resolveInput } from './sourceResolver.js';
 import { loadState, saveState } from './store.js';
 
@@ -59,7 +60,7 @@ async function ensurePanel() {
   if (!msg) {
     try {
       const recent = await channel.messages.fetch({ limit: 50 });
-      const panelTitles = new Set(['🎵 Peak Music', '🎶 NOW PLAYING', '🎧 DJ DURADEL']);
+      const panelTitles = new Set(['🎵 Peak Music', '🎶 NOW PLAYING', '💿 Now Playing', '🎧 DJ DURADEL']);
       msg = recent.find(m =>
         m.author?.id === client.user?.id &&
         m.embeds?.some(e => panelTitles.has(e.title))
@@ -114,7 +115,24 @@ async function requireVoice(interaction) {
     });
     return null;
   }
+
+  const activeChannelId = session?.connection?.joinConfig?.channelId;
+  if (activeChannelId && activeChannelId !== voice.id) {
+    await interaction.reply({
+      content: `Join <#${activeChannelId}> to control this player.`,
+      ephemeral: true
+    });
+    return null;
+  }
   return voice;
+}
+
+function updateActivity() {
+  if (!client.user) return;
+  const title = session?.current?.title;
+  client.user.setActivity(title ? title.slice(0, 120) : 'music • /play', {
+    type: ActivityType.Listening
+  });
 }
 
 async function addInput(interaction, input, options = {}) {
@@ -128,11 +146,15 @@ async function addInput(interaction, input, options = {}) {
     const tracks = await resolveInput(input, interaction.user.id);
     await session.enqueue(tracks, options);
 
-    await interaction.editReply(
-      tracks.length === 1
-        ? `Queued **${tracks[0].title}**.`
-        : `Queued **${tracks.length} tracks**.`
-    );
+    const label = tracks.length === 1 ? `**${tracks[0].title}**` : `**${tracks.length} tracks**`;
+    const message = options.playNow
+      ? `▶️ Playing ${label} now.`
+      : options.top
+        ? `⬆️ Added ${label} to the top of the queue.`
+        : session.current === tracks[0]
+          ? `▶️ Now playing ${label}.`
+          : `✅ Queued ${label} • ${session.queue.length} upcoming.`;
+    await interaction.editReply(message);
   } catch (err) {
     console.error(err);
     await interaction.editReply(`Couldn't queue that: ${err.message.slice(0, 1700)}`);
@@ -141,8 +163,12 @@ async function addInput(interaction, input, options = {}) {
 
 client.once('clientReady', async () => {
   const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID);
-  session = new MusicSession(guild, updatePanel);
+  session = new MusicSession(guild, async () => {
+    updateActivity();
+    await updatePanel();
+  });
 
+  updateActivity();
   await ensurePanel();
   startPanelTicker();
 
@@ -190,6 +216,13 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      if (interaction.commandName === 'help') {
+        await interaction.reply({ content: formatHelp(), ephemeral: true });
+        return;
+      }
+
+      if (!await requireVoice(interaction)) return;
+
       if (interaction.commandName === 'pause' || interaction.commandName === 'resume') {
         const shouldPause = interaction.commandName === 'pause';
         if (!session.current) {
@@ -224,9 +257,9 @@ client.on('interactionCreate', async interaction => {
       if (interaction.commandName === 'seek') {
         await interaction.deferReply({ ephemeral: true });
         const seconds = interaction.options.getInteger('seconds', true);
-        const changed = await session.seek(seconds);
+        const changed = await session.seekTo(seconds);
         await interaction.editReply(changed
-          ? `${seconds >= 0 ? 'Moved forward' : 'Rewound'} ${Math.abs(seconds)} seconds.`
+          ? `Jumped to ${seconds} seconds.`
           : 'Nothing is playing.');
         return;
       }
@@ -300,12 +333,13 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isButton()) {
       const id = interaction.customId;
 
+      if (id === 'music_queue') {
+        await interaction.reply({ content: formatQueue(session), ephemeral: true });
+        return;
+      }
+
       if (id === 'music_add') {
-        const voice = voiceFor(interaction);
-        if (!voice) {
-          await interaction.reply({ content: 'Join a voice channel first.', ephemeral: true });
-          return;
-        }
+        if (!await requireVoice(interaction)) return;
 
         const modal = new ModalBuilder()
           .setCustomId('music_add_modal')
@@ -323,6 +357,8 @@ client.on('interactionCreate', async interaction => {
         await interaction.showModal(modal);
         return;
       }
+
+      if (!await requireVoice(interaction)) return;
 
       if (id === 'music_pause') {
         await session.togglePause();
@@ -363,11 +399,6 @@ client.on('interactionCreate', async interaction => {
       if (id === 'music_stop') {
         await session.stop();
         await interaction.reply({ content: 'Stopped and cleared.', ephemeral: true });
-        return;
-      }
-
-      if (id === 'music_queue') {
-        await interaction.reply({ content: formatQueue(session), ephemeral: true });
         return;
       }
 
@@ -415,6 +446,7 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId === 'music_filter') {
+      if (!await requireVoice(interaction)) return;
       await interaction.deferReply({ ephemeral: true });
       const mode = interaction.values[0];
       await session.setFilter(mode);

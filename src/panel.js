@@ -34,12 +34,21 @@ function short(text, max = 70) {
 function queuePreview(session) {
   if (!session.queue.length) return session.autoplay
     ? '✨ Autoplay will choose a related song.'
-    : 'No songs queued.';
-  const rows = session.queue.slice(0, 4).map((track, index) =>
+    : 'Nothing queued — press **ADD SONG**.';
+  const rows = session.queue.slice(0, 3).map((track, index) =>
     `**${index + 1}.** [${short(track.title, 54)}](${track.url}) • ${fmt(track.duration)}`
   );
-  if (session.queue.length > 4) rows.push(`*+${session.queue.length - 4} more in queue*`);
+  if (session.queue.length > 3) rows.push(`*+${session.queue.length - 3} more*`);
   return rows.join('\n');
+}
+
+function activeModes(session) {
+  return [
+    session.loop ? '🔁 Loop' : null,
+    session.shuffle ? '🔀 Shuffle' : null,
+    session.autoplay ? '✨ Autoplay' : null,
+    session.stay247 ? '♾️ 24/7' : null
+  ].filter(Boolean).join(' • ') || 'Normal';
 }
 
 export function buildPanel(session) {
@@ -49,71 +58,55 @@ export function buildPanel(session) {
 
   const embed = new EmbedBuilder()
     .setColor(track ? 0x57f287 : 0x2b2d31)
-    .setTitle(track ? '🎶 NOW PLAYING' : '🎧 DJ DURADEL')
+    .setTitle(track ? '💿 Now Playing' : '🎧 DJ DURADEL')
     .setDescription(track
-      ? `### [${short(track.title, 100)}](${track.url})\n${track.uploader ? `**${short(track.uploader, 80)}**\n` : ''}\n${fmt(elapsed)}  ${progressBar(elapsed, track.duration)}  ${fmt(track.duration)}`
-      : 'Join a voice channel, press **ADD SONG**, or use `/play`.\nThe player stays in this one clean control panel.'
+      ? `### [${short(track.title, 100)}](${track.url})\n${track.uploader ? `by **${short(track.uploader, 80)}**\n` : ''}\n${progressBar(elapsed, track.duration)}\n\`${fmt(elapsed)} / ${fmt(track.duration)}\`${session.paused ? '  •  ⏸️ **Paused**' : ''}`
+      : '### Ready when you are\n**1.** Join a voice channel\n**2.** Press **ADD SONG**\n**3.** Paste a song name or link'
     )
-    .setFooter({ text: 'DJ Duradel • MatchBox-style controls • high-quality 128 kbps audio' })
+    .setFooter({ text: 'DJ Duradel • simple controls, serious sound' })
     .setTimestamp();
 
   if (track?.thumbnail) embed.setThumbnail(track.thumbnail);
 
-  embed.addFields(
-    {
-      name: '👤 Requested by',
-      value: track?.autoplay ? '✨ Autoplay' : track?.requestedBy ? `<@${track.requestedBy}>` : '—',
-      inline: true
-    },
-    {
-      name: '🔊 Volume',
-      value: `${Math.round(session.volume * 100)}%`,
-      inline: true
-    },
-    {
-      name: '🎚️ Filter',
-      value: filter.label,
-      inline: true
-    },
-    {
-      name: '⚙️ Modes',
-      value: [
-        session.loop ? '🔁 Loop' : null,
-        session.shuffle ? '🔀 Shuffle' : null,
-        session.autoplay ? '✨ Autoplay' : null,
-        session.stay247 ? '♾️ 24/7' : null
-      ].filter(Boolean).join(' • ') || 'Normal',
-      inline: false
-    },
-    {
-      name: `📜 UP NEXT • ${session.queue.length} track${session.queue.length === 1 ? '' : 's'}`,
-      value: queuePreview(session),
-      inline: false
-    }
-  );
-
   if (track) {
-    embed.addFields({
-      name: '📡 Stream',
-      value: `${track.source || 'Web'}${session.streamInfo?.abr ? ` • ~${Math.round(session.streamInfo.abr)} kbps` : ''}${session.streamInfo?.codec ? ` • ${session.streamInfo.codec}` : ''}`,
-      inline: false
-    });
+    embed.addFields(
+      {
+        name: '👤 Requested by',
+        value: track.autoplay ? '✨ Autoplay' : track.requestedBy ? `<@${track.requestedBy}>` : '—',
+        inline: true
+      },
+      {
+        name: '🔊 Sound',
+        value: `${Math.round(session.volume * 100)}% • ${filter.label}`,
+        inline: true
+      },
+      {
+        name: '⚙️ Modes',
+        value: activeModes(session),
+        inline: true
+      },
+      {
+        name: `📜 Up Next • ${session.queue.length}`,
+        value: queuePreview(session),
+        inline: false
+      }
+    );
   }
 
   const playback = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('music_queue').setLabel('QUEUE').setEmoji('📜').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('music_back').setLabel('BACK').setEmoji('⏮️').setStyle(ButtonStyle.Secondary).setDisabled(!session.history.length),
-    new ButtonBuilder().setCustomId('music_pause').setLabel(session.paused ? 'RESUME' : 'PAUSE').setEmoji(session.paused ? '▶️' : '⏸️').setStyle(ButtonStyle.Success).setDisabled(!track),
-    new ButtonBuilder().setCustomId('music_skip').setLabel('SKIP').setEmoji('⏭️').setStyle(ButtonStyle.Secondary).setDisabled(!track),
+    new ButtonBuilder().setCustomId('music_queue').setLabel('QUEUE').setEmoji('📜').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('music_back').setLabel('BACK').setEmoji('⏮️').setStyle(ButtonStyle.Success).setDisabled(!session.history.length),
+    new ButtonBuilder().setCustomId('music_pause').setLabel('PAUSE / RESUME').setEmoji(session.paused ? '▶️' : '⏸️').setStyle(ButtonStyle.Secondary).setDisabled(!track),
+    new ButtonBuilder().setCustomId('music_skip').setLabel('SKIP').setEmoji('⏭️').setStyle(ButtonStyle.Success).setDisabled(!track),
     new ButtonBuilder().setCustomId('music_autoplay').setLabel('AUTOPLAY').setEmoji('✨').setStyle(session.autoplay ? ButtonStyle.Success : ButtonStyle.Secondary)
   );
 
   const timeline = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('music_loop').setLabel('LOOP').setEmoji('🔁').setStyle(session.loop ? ButtonStyle.Success : ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('music_rewind').setLabel('-10s').setEmoji('⏪').setStyle(ButtonStyle.Secondary).setDisabled(!track),
-    new ButtonBuilder().setCustomId('music_forward').setLabel('+10s').setEmoji('⏩').setStyle(ButtonStyle.Secondary).setDisabled(!track),
-    new ButtonBuilder().setCustomId('music_replay').setLabel('REPLAY').setEmoji('🔄').setStyle(ButtonStyle.Secondary).setDisabled(!track),
-    new ButtonBuilder().setCustomId('music_stop').setLabel('STOP').setEmoji('⏹️').setStyle(ButtonStyle.Danger).setDisabled(!track)
+    new ButtonBuilder().setCustomId('music_rewind').setLabel('REWIND').setEmoji('⏪').setStyle(ButtonStyle.Success).setDisabled(!track),
+    new ButtonBuilder().setCustomId('music_stop').setLabel('STOP').setEmoji('⏹️').setStyle(ButtonStyle.Danger).setDisabled(!track),
+    new ButtonBuilder().setCustomId('music_forward').setLabel('FORWARD').setEmoji('⏩').setStyle(ButtonStyle.Success).setDisabled(!track),
+    new ButtonBuilder().setCustomId('music_replay').setLabel('REPLAY').setEmoji('🔄').setStyle(ButtonStyle.Success).setDisabled(!track)
   );
 
   const controls = new ActionRowBuilder().addComponents(
@@ -148,5 +141,21 @@ export function formatQueue(session) {
     lines.push(`${index + 1}. [${short(track.title, 75)}](${track.url}) • ${fmt(track.duration)}${track.requestedBy ? ` • <@${track.requestedBy}>` : ''}`);
   });
   if (session.queue.length > 20) lines.push(`…and ${session.queue.length - 20} more.`);
+  if (session.queue.length) lines.push('\nUse `/remove position:` to remove one song or `/clear` to clear upcoming songs.');
   return lines.length ? lines.join('\n') : 'The queue is empty. Press **ADD SONG** to start it.';
+}
+
+export function formatHelp() {
+  return [
+    '### 🎧 DJ Duradel — Quick Start',
+    '**1.** Join a voice channel',
+    '**2.** Press **ADD SONG** on the player',
+    '**3.** Enter a song, artist, or link',
+    '',
+    '**The buttons handle almost everything.** Use `/play` to queue quickly, `/queue` to see the full list, and `/remove` to remove a numbered song.',
+    '',
+    '✨ **Autoplay** keeps the music going  •  🎚️ **Filter** changes the sound  •  ♾️ **24/7** keeps the bot in voice',
+    '',
+    'Spotify tracks, YouTube searches, and most public media or playlist links are supported.'
+  ].join('\n');
 }

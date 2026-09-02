@@ -240,6 +240,13 @@ export class MusicSession {
     return this.restartCurrent(target);
   }
 
+  async seekTo(seconds) {
+    if (!this.current) return false;
+    const max = Number.isFinite(this.current.duration) ? Math.max(0, this.current.duration - 1) : Infinity;
+    const target = Math.max(0, Math.min(max, Number(seconds)));
+    return this.restartCurrent(target);
+  }
+
   async stop() {
     this.queue = [];
     this.current = null;
