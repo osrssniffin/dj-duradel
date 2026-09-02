@@ -21,7 +21,8 @@
     "@discordjs/voice": "0.19.2",
     "discord.js": "14.27.0",
     "dotenv": "16.6.1",
-    "ffmpeg-static": "5.2.0"
+    "ffmpeg-static": "5.2.0",
+    "opusscript": "0.0.8"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
