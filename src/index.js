@@ -8,7 +8,7 @@ import {
   ActionRowBuilder
 } from 'discord.js';
 
-import { MusicSession } from './music.js';
+import { AUDIO_FILTERS, MusicSession } from './music.js';
 import { startHealthServer } from './health.js';
 import { buildPanel, formatQueue } from './panel.js';
 import { resolveInput } from './sourceResolver.js';
@@ -59,9 +59,10 @@ async function ensurePanel() {
   if (!msg) {
     try {
       const recent = await channel.messages.fetch({ limit: 50 });
+      const panelTitles = new Set(['🎵 Peak Music', '🎶 NOW PLAYING', '🎧 DJ DURADEL']);
       msg = recent.find(m =>
         m.author?.id === client.user?.id &&
-        m.embeds?.some(e => e.title === '🎵 Peak Music')
+        m.embeds?.some(e => panelTitles.has(e.title))
       ) || null;
     } catch {}
   }
@@ -116,7 +117,7 @@ async function requireVoice(interaction) {
   return voice;
 }
 
-async function addInput(interaction, input) {
+async function addInput(interaction, input, options = {}) {
   const voice = await requireVoice(interaction);
   if (!voice) return;
 
@@ -125,7 +126,7 @@ async function addInput(interaction, input) {
   try {
     await session.connect(voice);
     const tracks = await resolveInput(input, interaction.user.id);
-    await session.enqueue(tracks);
+    await session.enqueue(tracks, options);
 
     await interaction.editReply(
       tracks.length === 1
@@ -138,7 +139,7 @@ async function addInput(interaction, input) {
   }
 }
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID);
   session = new MusicSession(guild, updatePanel);
 
@@ -168,6 +169,16 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      if (interaction.commandName === 'playtop') {
+        await addInput(interaction, interaction.options.getString('input', true), { top: true });
+        return;
+      }
+
+      if (interaction.commandName === 'playskip') {
+        await addInput(interaction, interaction.options.getString('input', true), { playNow: true });
+        return;
+      }
+
       if (interaction.commandName === 'panel') {
         await ensurePanel();
         await interaction.reply({ content: 'Music panel refreshed.', ephemeral: true });
@@ -179,15 +190,109 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      if (interaction.commandName === 'pause' || interaction.commandName === 'resume') {
+        const shouldPause = interaction.commandName === 'pause';
+        if (!session.current) {
+          await interaction.reply({ content: 'Nothing is playing.', ephemeral: true });
+        } else if (session.paused === shouldPause) {
+          await interaction.reply({ content: shouldPause ? 'Already paused.' : 'Already playing.', ephemeral: true });
+        } else {
+          await session.togglePause();
+          await interaction.reply({ content: shouldPause ? 'Paused.' : 'Resumed.', ephemeral: true });
+        }
+        return;
+      }
+
       if (interaction.commandName === 'skip') {
-        await session.skip();
-        await interaction.reply({ content: 'Skipped.', ephemeral: true });
+        const changed = await session.skip();
+        await interaction.reply({ content: changed ? 'Skipped.' : 'Nothing is playing.', ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'back') {
+        const changed = await session.back();
+        await interaction.reply({ content: changed ? 'Playing the previous song.' : 'There is no previous song yet.', ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'replay') {
+        const changed = await session.replay();
+        await interaction.reply({ content: changed ? 'Restarted the song.' : 'Nothing is playing.', ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'seek') {
+        await interaction.deferReply({ ephemeral: true });
+        const seconds = interaction.options.getInteger('seconds', true);
+        const changed = await session.seek(seconds);
+        await interaction.editReply(changed
+          ? `${seconds >= 0 ? 'Moved forward' : 'Rewound'} ${Math.abs(seconds)} seconds.`
+          : 'Nothing is playing.');
         return;
       }
 
       if (interaction.commandName === 'stop') {
         await session.stop();
         await interaction.reply({ content: 'Stopped and cleared the queue.', ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'clear') {
+        await session.clearQueue();
+        await interaction.reply({ content: 'Cleared the upcoming queue.', ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'remove') {
+        const removed = await session.removeAt(interaction.options.getInteger('position', true));
+        await interaction.reply({
+          content: removed ? `Removed **${removed.title}**.` : 'That queue position does not exist.',
+          ephemeral: true
+        });
+        return;
+      }
+
+      if (interaction.commandName === 'shuffle') {
+        await session.toggleShuffle();
+        await interaction.reply({ content: `Shuffle ${session.shuffle ? 'on' : 'off'}.`, ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'loop') {
+        await session.toggleLoop();
+        await interaction.reply({ content: `Loop ${session.loop ? 'on' : 'off'}.`, ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'autoplay') {
+        await session.toggleAutoplay();
+        await interaction.reply({ content: `Autoplay ${session.autoplay ? 'on' : 'off'}.`, ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'volume') {
+        await session.setVolume(interaction.options.getInteger('percent', true) / 100);
+        await interaction.reply({ content: `Volume ${Math.round(session.volume * 100)}%.`, ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'filter') {
+        await interaction.deferReply({ ephemeral: true });
+        const mode = interaction.options.getString('mode', true);
+        await session.setFilter(mode);
+        await interaction.editReply(`Audio filter: **${AUDIO_FILTERS[mode].label}**.`);
+        return;
+      }
+
+      if (interaction.commandName === 'stay') {
+        await session.toggle247();
+        await interaction.reply({ content: `24/7 mode ${session.stay247 ? 'on' : 'off'}.`, ephemeral: true });
+        return;
+      }
+
+      if (interaction.commandName === 'leave') {
+        await session.leave();
+        await interaction.reply({ content: 'Disconnected.', ephemeral: true });
         return;
       }
     }
@@ -226,8 +331,32 @@ client.on('interactionCreate', async interaction => {
       }
 
       if (id === 'music_skip') {
-        await session.skip();
-        await interaction.reply({ content: 'Skipped.', ephemeral: true });
+        const changed = await session.skip();
+        await interaction.reply({ content: changed ? 'Skipped.' : 'Nothing is playing.', ephemeral: true });
+        return;
+      }
+
+      if (id === 'music_back') {
+        await interaction.deferReply({ ephemeral: true });
+        const changed = await session.back();
+        await interaction.editReply(changed ? 'Playing the previous song.' : 'There is no previous song yet.');
+        return;
+      }
+
+      if (id === 'music_replay') {
+        await interaction.deferReply({ ephemeral: true });
+        const changed = await session.replay();
+        await interaction.editReply(changed ? 'Restarted the song.' : 'Nothing is playing.');
+        return;
+      }
+
+      if (id === 'music_rewind' || id === 'music_forward') {
+        await interaction.deferReply({ ephemeral: true });
+        const seconds = id === 'music_rewind' ? -10 : 10;
+        const changed = await session.seek(seconds);
+        await interaction.editReply(changed
+          ? `${seconds < 0 ? 'Rewound' : 'Moved forward'} 10 seconds.`
+          : 'Nothing is playing.');
         return;
       }
 
@@ -254,6 +383,18 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      if (id === 'music_autoplay') {
+        await session.toggleAutoplay();
+        await interaction.reply({ content: `Autoplay ${session.autoplay ? 'on' : 'off'}.`, ephemeral: true });
+        return;
+      }
+
+      if (id === 'music_247') {
+        await session.toggle247();
+        await interaction.reply({ content: `24/7 mode ${session.stay247 ? 'on' : 'off'}.`, ephemeral: true });
+        return;
+      }
+
       if (id === 'music_vol_down') {
         await session.adjustVolume(-0.1);
         await interaction.reply({ content: `Volume ${Math.round(session.volume * 100)}%.`, ephemeral: true });
@@ -271,6 +412,14 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: 'Disconnected.', ephemeral: true });
         return;
       }
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === 'music_filter') {
+      await interaction.deferReply({ ephemeral: true });
+      const mode = interaction.values[0];
+      await session.setFilter(mode);
+      await interaction.editReply(`Audio filter: **${AUDIO_FILTERS[mode].label}**.`);
+      return;
     }
 
     if (interaction.isModalSubmit() && interaction.customId === 'music_add_modal') {

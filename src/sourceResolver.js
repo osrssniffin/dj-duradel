@@ -237,6 +237,38 @@ export async function resolveInput(input, requestedBy, opts = {}) {
 }
 
 /**
+ * Find a sensible related track for autoplay without requiring another API.
+ * A wider YouTube search lets us skip the current song and anything already
+ * heard or queued in this session.
+ */
+export async function resolveRecommended(track, requestedBy, excluded = new Set()) {
+  const query = `${track.uploader || ''} ${track.title || ''} similar music`.trim();
+  const stdout = await runYtDlp([
+    '--dump-single-json',
+    '--ignore-errors',
+    '--no-warnings',
+    '--no-call-home',
+    `ytsearch8:${query}`
+  ]);
+
+  const data = JSON.parse(stdout);
+  const entries = Array.isArray(data.entries) ? data.entries.filter(Boolean) : [data];
+  const blocked = new Set([
+    track.id,
+    track.url,
+    ...excluded
+  ].filter(Boolean));
+
+  return entries
+    .map(x => normalizeEntry(x, requestedBy))
+    .find(candidate =>
+      candidate.url &&
+      !blocked.has(candidate.id) &&
+      !blocked.has(candidate.url)
+    ) || null;
+}
+
+/**
  * Returns a fresh direct audio URL. Never store these long-term; many expire.
  */
 export async function getFreshAudio(track) {
