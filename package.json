@@ -1,0 +1,22 @@
+{
+  "name": "peak-music-bot",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Persistent-panel Discord music bot for Peak PvM",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node scripts/register-commands.js",
+    "check": "node --check src/index.js && node --check src/music.js && node --check src/panel.js && node --check src/sourceResolver.js && node --check src/store.js && node --check scripts/register-commands.js",
+    "setup": "node scripts/first-run.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "0.19.2",
+    "discord.js": "14.27.0",
+    "dotenv": "16.6.1",
+    "ffmpeg-static": "5.2.0"
+  }
+}
