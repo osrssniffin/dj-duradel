@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 
 import { MusicSession } from './music.js';
+import { startHealthServer } from './health.js';
 import { buildPanel, formatQueue } from './panel.js';
 import { resolveInput } from './sourceResolver.js';
 import { loadState, saveState } from './store.js';
@@ -28,6 +29,15 @@ const client = new Client({
 let state = await loadState();
 let session;
 let panelUpdateTimer = null;
+
+const healthServer = startHealthServer(() => ({
+  ok: client.isReady(),
+  discordReady: client.isReady(),
+  playing: Boolean(session?.current),
+  paused: Boolean(session?.paused),
+  queueLength: session?.queue?.length || 0,
+  uptimeSeconds: Math.floor(process.uptime())
+}));
 
 async function musicChannel() {
   const ch = await client.channels.fetch(process.env.MUSIC_CHANNEL_ID);
@@ -279,10 +289,19 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-process.on('SIGINT', async () => {
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`Received ${signal}; shutting down.`);
+  clearInterval(panelUpdateTimer);
   try { await session?.leave(); } catch {}
   client.destroy();
-  process.exit(0);
-});
+  healthServer.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5_000).unref();
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 client.login(process.env.DISCORD_TOKEN);

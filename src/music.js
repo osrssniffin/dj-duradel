@@ -11,6 +11,8 @@ import {
 import ffmpegPath from 'ffmpeg-static';
 import { getFreshAudio } from './sourceResolver.js';
 
+const FFMPEG = process.env.FFMPEG_PATH || ffmpegPath;
+
 export class MusicSession {
   constructor(guild, onChange) {
     this.guild = guild;
@@ -99,7 +101,7 @@ export class MusicSession {
       const fresh = await getFreshAudio(this.current);
       this.streamInfo = fresh;
 
-      const ffmpeg = spawn(ffmpegPath, [
+      const ffmpeg = spawn(FFMPEG, [
         '-hide_banner',
         '-loglevel', 'error',
         '-reconnect', '1',
