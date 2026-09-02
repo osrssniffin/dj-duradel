@@ -23,6 +23,7 @@ const commands = [
     .setName('playskip')
     .setDescription('Play a song immediately, then return to the current queue')),
   new SlashCommandBuilder().setName('panel').setDescription('Create or refresh the permanent music panel'),
+  new SlashCommandBuilder().setName('help').setDescription('Show the simple DJ Duradel quick-start guide'),
   new SlashCommandBuilder().setName('queue').setDescription('Show the current music queue'),
   new SlashCommandBuilder().setName('pause').setDescription('Pause the current song'),
   new SlashCommandBuilder().setName('resume').setDescription('Resume the current song'),
@@ -31,10 +32,10 @@ const commands = [
   new SlashCommandBuilder().setName('replay').setDescription('Restart the current song'),
   new SlashCommandBuilder()
     .setName('seek')
-    .setDescription('Move forward or backward in the current song')
+    .setDescription('Jump to an exact point in the current song')
     .addIntegerOption(option => option.setName('seconds')
-      .setDescription('Positive moves forward; negative rewinds')
-      .setMinValue(-3600).setMaxValue(3600).setRequired(true)),
+      .setDescription('Timestamp in seconds from the beginning')
+      .setMinValue(0).setMaxValue(86400).setRequired(true)),
   new SlashCommandBuilder().setName('stop').setDescription('Stop playback and clear the queue'),
   new SlashCommandBuilder().setName('clear').setDescription('Clear upcoming songs without stopping the current one'),
   new SlashCommandBuilder()
