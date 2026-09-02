@@ -5,11 +5,11 @@ Discord Gateway/voice connections, yt-dlp, and FFmpeg.
 
 ## Features
 
-- One polished MatchBox-style `🎶 NOW PLAYING` panel with progress, artwork, queue preview,
+- One polished MatchBox-style `💿 Now Playing` panel with progress, artwork, queue preview,
   requester, audio details, and every common playback control
 - `/play`, `/playtop`, `/playskip`, `/queue`, `/pause`, `/resume`, `/skip`, `/back`,
   `/replay`, `/seek`, `/stop`, `/clear`, `/remove`, `/shuffle`, `/loop`, `/autoplay`,
-  `/volume`, `/filter`, `/stay`, `/leave`, and `/panel`
+  `/volume`, `/filter`, `/stay`, `/leave`, `/help`, and `/panel`
 - Queue, back, pause/resume, skip, autoplay, loop, rewind, fast-forward, replay, stop,
   add-song, shuffle, 24/7, and volume buttons
 - Clean, bass boost, nightcore, vaporwave, 8D, and karaoke audio modes
@@ -17,6 +17,8 @@ Discord Gateway/voice connections, yt-dlp, and FFmpeg.
 - YouTube search and broad URL/playlist support through yt-dlp
 - Spotify track metadata matching; optional Spotify playlist/album expansion
 - Automatic voice-channel join, idle leave, and optional 24/7 stay mode
+- Same-channel control protection so listeners elsewhere cannot hijack playback
+- Dynamic Discord activity showing the current song and an easy `/help` quick start
 - Existing-panel recovery after a restart, even when local state is gone
 
 ## Recommended host: Cloudflare Containers
